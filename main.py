@@ -1,59 +1,74 @@
-from fastapi import FastAPI
-import uvicorn
-from connectDB import connect_to_mongo
-from schema import HeartDisease
 import pickle
 import numpy as np
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from connectDB import connect_to_mongo
+from schema import schema
 
 app = FastAPI()
+
+# Allowing CORS for frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Connecting to MongoDB
 db = connect_to_mongo()
 collection = db["HeartDisease"]
 
+# Loading the trained model
 filename = 'heart-disease-model.pkl'
-model = pickle.load(open(filename, 'rb'))
+with open(filename, 'rb') as file:
+    model = pickle.load(file)
 
-@app.post('/store')
-async def store(data: HeartDisease):
-    
+@app.post("/store")
+async def store(data: dict):
     try:
-        data_dict = data.dict()
-        collection.insert_one(data_dict)
-    
-        return {'message': 'Data stored successfully'}
+        email = data.get('email', '')
+        
+        # Checking if email already exists
+        if collection.find_one({"email": email}):
+            return {"message": "Data already exists"}
+        
+        # Validating and inserting data into MongoDB
+        converted_data = {key: schema[key](value) for key, value in data.items()}
+        collection.insert_one(converted_data)
+        
+        return {"message": "Data received successfully"}
     except Exception as e:
         return {'error': str(e)}
     
 @app.post('/predict')
-async def predict(data:dict):
+async def predict(data: dict):
     try:
-        name = data.get("name","")
-        x = collection.find_one({"name":name})
-        # print(x['sex'])
-        print(x)
+        email = data.get("email", "")
+        x = collection.find_one({"email": email})
         
-        age = int(x['age'])
-        sex = x['sex']
-        cp = x['cp']
-        trestbps = int(x['trestbps'])
-        chol = int(x['chol'])
-        fbs = x['fbs']
-        restecg = int(x['restecg'])
-        thalach = int(x['thalach'])
-        exang = x['exang']
-        oldpeak = float(x['oldpeak'])
-        slope = x['slope']
-        ca = int(x['ca'])
-        thal = x['thal']
+        # Checking if data exists if not raise 404 error
+        if x is None:
+            raise HTTPException(status_code=404, detail="Data not found")
         
-        model_input = np.array([[age,sex,cp,trestbps,chol,fbs,restecg,thalach,exang,oldpeak,slope,ca,thal]])
+        # Extracting features for prediction
+        features = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg',
+                    'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal']
+        model_input = np.array([[x[feature] for feature in features]])
         
+        # Making prediction
         output = model.predict(model_input)
-        print(output)
         
-        return {'message': 'Prediction successful'}
+        # Updating MongoDB with prediction result
+        disease_status = "YES" if output[0] == 1 else "NO"
+        collection.update_one({"email": email}, {"$set": {"disease": disease_status}})
+        
+        return JSONResponse(content={'output': int(output[0])})
     except Exception as e:
         return {'error': str(e)}
 
 if __name__ == '__main__':
-    uvicorn.run(app)    
-    
+    import uvicorn
+    uvicorn.run(app)

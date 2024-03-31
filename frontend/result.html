@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Heart Disease Predictor</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <div class="container">
+      <h2 class="container-heading">
+        <span class="heading_font">Heart Disease Predictor</span>
+      </h2>
+      <div class="description">
+        <p>
+          A Machine Learning Web App, Built with FastAPI.
+        </p>
+      </div>
+    </div>
+    <form id="predictionForm">
+      <div class="ml-container">
+        <label for="name">email</label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          placeholder="Your email.."
+        /><br />
+        <input type="submit" class="my-cta-button" value="Predict" />
+      </div>
+    </form>
+
+    <div class="results">
+      <h1 id="predictionResult"></h1>
+    </div>
+
+    <div class="footer">
+      <p class="footer-description">Made by Amritesh Kumar.</p>
+    </div>
+    <script>
+      document
+        .getElementById("predictionForm")
+        .addEventListener("submit", function (event) {
+          event.preventDefault();
+
+          let formData = {
+            email: document.getElementById("name").value,
+          };
+
+          console.log(formData);
+          fetch("http://127.0.0.1:8000/predict", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(formData),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.output === 1) {
+                document.getElementById("predictionResult").innerHTML =
+                  "Prediction: <span class='danger'>Oops! You have Chances of Heart Disease.</span>";
+              } else if (data.output === 0) {
+                document.getElementById("predictionResult").innerHTML =
+                  "Prediction: <span class='safe'>Great! You DON'T have chances of Heart Disease.</span>";
+              } else {
+                document.getElementById("predictionResult").innerHTML =
+                  "Prediction: <span class='danger'>Error in prediction.</span>";
+              }
+            })
+            .catch((error) => {
+              console.error("There was a problem with form submission:", error);
+            });
+        });
+    </script>
+  </body>
+</html>
