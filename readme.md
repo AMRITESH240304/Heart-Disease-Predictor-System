@@ -7,7 +7,7 @@ git clone https://github.com/AMRITESH240304/Heart-Disease-Predictor-System.git
 `
 
 `
-pip install requirements.txt
+pip install -r requirements.txt
 `
 
 ### go to the connectDB.py file and paste the your mongodb URI 
